@@ -1,9 +1,10 @@
 import unittest
 import numpy as np
 import faiss
+from dotenv import load_dotenv
+from unittest.mock import patch
 from analysis.code_analyzer import vectorize_code_structure, query_code_suggestions
-from langchain.embeddings import OpenAIEmbeddings
-
+import os
 class TestCodeAnalysis(unittest.TestCase):
 
     def setUp(self):
@@ -12,10 +13,27 @@ class TestCodeAnalysis(unittest.TestCase):
             'function_b': "def function_b(): return 'Hello, World!'",
             'function_c': "def function_c(x): return x * 2"
         }
-        self.embeddings = OpenAIEmbeddings(api_key='test_key')  # Use a mock key for tests
-        self.fuzzy_vectors = np.array([self.embeddings.embed(snippet) for snippet in self.code_base.values()]).astype('float32')
-        self.index = faiss.IndexFlatL2(self.fuzzy_vectors.shape[1])
-        self.index.add(self.fuzzy_vectors)  # Prepare the index for querying
+
+        load_dotenv()
+
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+
+        if not openai_api_key:
+            import getpass
+            openai_api_key = getpass.getpass("Enter API key for OpenAI: ")
+
+        os.environ["OPENAI_API_KEY"] = openai_api_key
+
+        # Mock the OpenAIEmbeddings to return a fixed embedding (as a NumPy array)
+        with patch('langchain_openai.OpenAIEmbeddings') as MockEmbeddings:
+            self.mock_embeddings = MockEmbeddings.return_value
+            # Simulate an embedding with random values as a NumPy array
+            self.mock_embeddings.embed_query.return_value = np.random.rand(1536).astype('float32')  # Simulate an embedding with 1536 dimensions
+
+            # Create embeddings for the code base
+            self.fuzzy_vectors = np.array([self.mock_embeddings.embed_query(snippet) for snippet in self.code_base.values()]).astype('float32')
+            self.index = faiss.IndexFlatL2(self.fuzzy_vectors.shape[1])
+            self.index.add(self.fuzzy_vectors)  # Prepare the index for querying
 
     def test_vectorization(self):
         """Test if the vectorization works correctly."""
@@ -28,7 +46,7 @@ class TestCodeAnalysis(unittest.TestCase):
         user_query = "How can I improve function_b?"
         suggestions = query_code_suggestions(user_query, self.index, self.code_base, k=2)
         
-        # Check if suggestions are returned and are in correct format
+        # Check if suggestions are returned and are in the correct format
         self.assertIsInstance(suggestions, dict)
         self.assertGreater(len(suggestions), 0)  # Ensure there is at least one suggestion
 
