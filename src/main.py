@@ -20,7 +20,6 @@ model = init_chat_model("gpt-4o-mini", model_provider="openai")
 nlp_processor = NLPProcessor()  # Initialize NLPProcessor
 
 def provide_suggestions(suggestions, code_base):
-    """Format and provide suggestions based on their relevance."""
     response_lines = []
     for func_name, info in suggestions.items():
         distance = info["distance"]
@@ -100,13 +99,11 @@ def function_e(data):
         if user_query.lower() == 'exit':
             break
         
-        # Use the NLPProcessor to get code suggestions or explanations based on the user query
+        # Check if the user wants an explanation or suggestions
         if "explain" in user_query.lower():
-            # Trigger explanation functionality
             explanation = nlp_processor.get_code_explanation(user_query)
             print(f"\nExplanation:\n{explanation}")
         else:
-            # Query for code suggestions using the embedded vector index
             suggestions = query_code_suggestions(user_query, faiss_index, code_base)
 
             print("\nSuggestions:")
